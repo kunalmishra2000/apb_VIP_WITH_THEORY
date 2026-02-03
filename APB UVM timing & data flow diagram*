@@ -1,0 +1,95 @@
+Perfect! Let’s make a **clean APB UVM timing & data flow diagram** — showing **exactly when driver drives, DUT responds, monitor samples, reference model updates, and scoreboard compares**. I’ll separate **write vs read** clearly so nothing gets mixed up.
+
+---
+
+## **APB Transaction Timing Diagram with UVM Roles**
+
+```
+Time → 
+
+        Sequence Item Generated
+        +--------------------------------+
+        | addr=0x10, write_data=0xABCD  |
+        +--------------------------------+
+
+Driver (Master) Drives Signals
+PSEL      _________/‾‾‾‾‾‾‾‾‾‾‾‾\________
+PENABLE   _______/‾‾‾‾‾‾‾‾‾‾‾‾‾\_______
+PADDR     0x10 -------------------------
+PWDATA    0xABCD -----------------------
+PWRITE    1 -----------------------------
+(DRIVER → DUT)
+
+DUT (Slave) Responds
+PREADY    ___________/‾‾‾‾‾‾‾‾‾‾\______
+PRDATA    (not valid for write)         
+(Observed only for read)
+(DUT → BUS)
+
+Monitor Observes
+pwdata captured here → seq_item_h.pwdata
+(wait until PREADY=1 for write completion)
+
+Monitor → Reference Model
+seq_item_h.pwdata sent → ref_model.memory[0x10] = 0xABCD
+(used to generate expected data for future reads)
+
+---
+
+Read Transaction Example (from same addr)
+
+Sequence Item Generated
++--------------------------------+
+| addr=0x10, read_flag=1         |
++--------------------------------+
+
+Driver (Master) Drives Signals
+PSEL      _________/‾‾‾‾‾‾‾‾‾‾‾‾\________
+PENABLE   _______/‾‾‾‾‾‾‾‾‾‾‾‾‾\_______
+PADDR     0x10 -------------------------
+PWRITE    0 -----------------------------
+(DRIVER → DUT)
+
+DUT (Slave) Responds
+PREADY    ___________/‾‾‾‾‾‾‾‾‾‾\______
+PRDATA    ________/‾‾‾‾‾‾‾‾‾‾‾‾\____
+          0xABCD  (actual read data)
+
+Monitor Observes
+prdata captured here → seq_item_h.prdata
+
+Reference Model Computes Expected
+expected = ref_model.memory[0x10] = 0xABCD
+
+Scoreboard Comparison
+actual (monitor.prdata) == expected (ref_model) → PASS
+```
+
+---
+
+### **Clean Role Summary in Timing Context**
+
+| Role                | Write Transaction                       | Read Transaction                   |
+| ------------------- | --------------------------------------- | ---------------------------------- |
+| **Sequence**        | Generates intended write (addr/data)    | Generates intended read (addr)     |
+| **Driver**          | Drives PADDR/PWDATA/PWRITE/PSEL/PENABLE | Drives PADDR/PWRITE=0/PSEL/PENABLE |
+| **DUT**             | Accepts write, sets PREADY              | Outputs PRDATA when PREADY=1       |
+| **Monitor**         | Captures pwdata **after PREADY**        | Captures prdata **after PREADY**   |
+| **Reference Model** | Updates memory from captured pwdata     | Computes expected read value       |
+| **Scoreboard**      | N/A                                     | Compares actual vs expected        |
+
+---
+
+### ✅ Key Takeaways
+
+1. **Monitor always observes the actual bus signals** — nothing is assumed.
+2. **Reference model generates expected data** using **observed writes**.
+3. **Scoreboard only compares actual vs expected** — never trusts the driver directly.
+4. Timing is **PSEL + PENABLE + PREADY** for completion.
+5. **Write and read transactions are separate** — write data captured becomes **expected for future reads**.
+
+---
+
+If you want, I can now **draw an even clearer visual “sequence diagram” with lanes for Sequence, Driver, DUT, Monitor, Ref Model, Scoreboard**, so you can see exactly **who does what at each cycle**.
+
+Do you want me to do that next?
