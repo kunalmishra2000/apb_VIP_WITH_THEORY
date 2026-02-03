@@ -1,0 +1,85 @@
+Absolutely! Let’s make **two separate, clear diagrams**: one for a **write transaction** and one for a **read transaction** in a UVM APB testbench. I’ll show **Driver, Monitor, Reference Model, Scoreboard behavior** at each stage.
+
+---
+
+## **1️⃣ Write Transaction Flow**
+
+**Scenario:** Sequence generates `write addr=0x10, data=0xABCD`
+
+```
+Time →
+Sequence Lane          Driver Lane             DUT Lane             Monitor Lane            Ref Model Lane          Scoreboard Lane
+-------------------------------------------------------------------------------------------------------------------------------
+Generate write         
+(seq_item)             |                      |                     |                       |                      |
+addr=0x10, pwdata=0xABCD|                      |                     |                       |                      |
+------------------------->|                      |                     |                       |                      |
+                         Drive PADDR/PWDATA/PWRITE/PSEL/PENABLE    |                     |                      |
+                         ---------------------->|                     |                       |                      |
+                         |                      Latch write, assert PREADY |                       |                      |
+                         |                      <--------------------|                       |                      |
+                         |                      |                     Capture pwdata          |                      |
+                         |                      |                     ---------------------->| Update memory[0x10]  |
+                         |                      |                     |                       |                      |
+                         |                      |                     |                       |                      |
+                         |                      |                     |                       |                      |
+Result: DUT memory updated, reference model memory updated using monitor captured write data
+Scoreboard does not compare yet (write only)
+```
+
+### **Key Points for Write**
+
+* **Driver:** drives the bus signals
+* **DUT:** receives write, updates internal memory
+* **Monitor:** observes bus, captures `pwdata`
+* **Reference Model:** updates expected memory using captured `pwdata`
+* **Scoreboard:** does **not compare yet**, write only updates expected values
+
+---
+
+## **2️⃣ Read Transaction Flow**
+
+**Scenario:** Sequence generates `read addr=0x10`
+
+```
+Time →
+Sequence Lane          Driver Lane             DUT Lane             Monitor Lane            Ref Model Lane          Scoreboard Lane
+-------------------------------------------------------------------------------------------------------------------------------
+Generate read         
+(seq_item)             |                      |                     |                       |                      |
+addr=0x10              |                      |                     |                       |                      |
+------------------------->|                      |                     |                       |                      |
+                         Drive PADDR/PWRITE=0/PSEL/PENABLE       |                     |                      |
+                         ---------------------->|                     |                       |                      |
+                         |                      DUT outputs PRDATA & PREADY |                       |                      |
+                         |                      <--------------------|                       |                      |
+                         |                      |                     Capture prdata          |                      |
+                         |                      |                     ---------------------->|                      |
+                         |                      |                     |                       Compute expected=memory[0x10] |
+                         |                      |                     |                       ---------------------->|
+                         |                      |                     |                       |                      Compare actual vs expected
+                         |                      |                     |                       |                      -----------------> Result: PASS/FAIL
+```
+
+### **Key Points for Read**
+
+* **Driver:** drives bus signals for read
+* **DUT:** responds with `PRDATA`
+* **Monitor:** captures actual read data (`prdata`)
+* **Reference Model:** computes expected read value from memory updated by prior writes
+* **Scoreboard:** compares actual vs expected → determines pass/fail
+
+---
+
+### ✅ Summary Table
+
+| Transaction | Driver                             | DUT                        | Monitor           | Reference Model                    | Scoreboard                  |
+| ----------- | ---------------------------------- | -------------------------- | ----------------- | ---------------------------------- | --------------------------- |
+| **Write**   | Drives `PADDR`, `PWDATA`, `PWRITE` | Latches write, sets PREADY | Captures `pwdata` | Updates memory (`expected`)        | No comparison               |
+| **Read**    | Drives `PADDR`, `PWRITE=0`         | Drives `PRDATA`, `PREADY`  | Captures `prdata` | Computes expected read from memory | Compares actual vs expected |
+
+---
+
+If you want, I can make a **single combined diagram with arrows showing “write flow” vs “read flow” side by side** — this is often easier for interviews or documentation.
+
+Do you want me to do that?
