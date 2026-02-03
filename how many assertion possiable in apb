@@ -1,0 +1,156 @@
+Short answer first: **there is no fixed “maximum” number of assertions for APB3** 🙂
+The number depends on **how deep you want to verify** and **what role you’re checking (master, slave, or bus monitor)**.
+
+That said, in *real verification projects*, APB3 typically ends up with **~20 to 40 solid assertions**. Let me break that down so it makes sense.
+
+---
+
+## Why there’s no max number
+
+APB3 is:
+
+* Simple protocol
+* Level-based
+* No burst, no IDs, no out-of-order
+
+But assertions can be written at **different granularities**:
+
+* Signal-level
+* Phase-level
+* FSM-level
+* Data stability
+* Error handling
+* Optional design rules
+
+Each rule can be **1 big assertion** or **several small ones**.
+
+---
+
+## Typical APB3 assertion breakdown
+
+### 1️⃣ Reset rules (2–4)
+
+Examples:
+
+* `PSEL == 0` during reset
+* `PENABLE == 0` during reset
+* No X/Z on bus after reset
+
+👉 **~3 assertions**
+
+---
+
+### 2️⃣ Basic protocol sequencing (6–8)
+
+Examples:
+
+* IDLE → SETUP
+* SETUP → ACCESS (next cycle mandatory)
+* ACCESS → IDLE or SETUP
+* PENABLE only high when PSEL is high
+* No skipping SETUP phase
+
+👉 **~7 assertions**
+
+---
+
+### 3️⃣ READY / wait-state rules (5–7)
+
+Examples:
+
+* PENABLE remains high until PREADY
+* PSEL remains high until PREADY
+* PREADY only sampled in ACCESS
+* No READY in SETUP phase
+
+👉 **~6 assertions**
+
+---
+
+### 4️⃣ Address & control stability (4–6)
+
+Examples:
+
+* PADDR stable until READY
+* PWRITE stable until READY
+* PWDATA stable for write
+* No change during wait states
+
+👉 **~5 assertions**
+
+---
+
+### 5️⃣ Read/write correctness (4–6)
+
+Examples:
+
+* PRDATA valid only when READY
+* PRDATA stable when READY low
+* PWDATA only valid during write
+* No X on PRDATA when READY
+
+👉 **~5 assertions**
+
+---
+
+### 6️⃣ Error handling (APB3 specific) (2–4)
+
+Examples:
+
+* PSLVERR only asserted when READY
+* PSLVERR only in ACCESS phase
+
+👉 **~3 assertions**
+
+---
+
+### 7️⃣ Illegal / defensive checks (optional, 4–8)
+
+Examples:
+
+* No X/Z on critical signals
+* No PENABLE glitches
+* No PSEL drop before READY
+
+👉 **~6 assertions**
+
+---
+
+## 🔢 Realistic totals
+
+| Verification depth               | Assertion count |
+| -------------------------------- | --------------- |
+| Minimal sanity                   | 10–15           |
+| **Normal project (most common)** | **20–30**       |
+| Very strict / VIP-like           | 35–45           |
+| Formal-quality checker           | 50+             |
+
+---
+
+## What matters more than the number 💡
+
+Interviewers and leads **don’t care about the count**. They care about:
+
+* Do you cover **all protocol rules**?
+* Are assertions **simple and debuggable**?
+* Do they catch **real bugs**, not just pass sims?
+
+10 *good* assertions > 50 bad ones.
+
+---
+
+## Best practice (real-world tip)
+
+👉 Write **one assertion per rule**
+👉 Split when debug matters
+👉 Add coverage after assertions
+
+---
+
+If you want, I can:
+
+* Give you a **checklist of must-have APB3 assertions**
+* Show how **Cadence/ARM VIPs** structure theirs
+* Help you explain this answer perfectly in an **interview**
+
+Just tell me 😄
