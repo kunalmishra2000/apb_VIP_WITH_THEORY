@@ -1,0 +1,64 @@
+Exactly ✅ — you’ve got it. Let me make it crystal clear:
+
+---
+
+## 1️⃣ Coverpoint vs Cross
+
+| Concept    | What it checks                                                        |
+| ---------- | --------------------------------------------------------------------- |
+| Coverpoint | “Did **this feature / signal / scenario** happen at all?”             |
+| Cross      | “Did **this feature happen together with that feature / condition**?” |
+
+So cross is **all about combinations**, not single features.
+
+---
+
+## 2️⃣ Cross is used **only when combinations matter**
+
+Examples:
+
+### APB context
+
+| Combination           | Why we care                                                          |
+| --------------------- | -------------------------------------------------------------------- |
+| Read × Wait state     | We must test reads with wait cycles; just testing reads isn’t enough |
+| Write × High address  | Must verify writes to the upper address space                        |
+| Back-to-back × Wait   | Critical corner case for timing & bus correctness                    |
+| Error × Transfer type | Ensure errors happen on both read and write                          |
+
+Without the cross, you might think everything is covered when in reality some combinations **never happened**.
+
+---
+
+## 3️⃣ Rule of thumb
+
+> **“If the spec says Feature A happens under condition B, use a cross.”**
+
+Example in words:
+
+* “We need to test write transfers to high addresses while the slave inserts wait states.”
+  → This is a **feature × scenario cross**
+
+---
+
+## 4️⃣ When not to use cross
+
+* Random combinations that don’t matter
+* Large value ranges (like every possible 32-bit address)
+* Signals/features that are independent
+
+Otherwise you get **bin explosion** and meaningless coverage numbers.
+
+---
+
+## 5️⃣ Summary
+
+* Coverpoint → individual features, values, or scenarios
+* Cross → **specific combinations of features/scenarios that the spec requires**
+* Cross is **intent-driven**, not just for “higher %”
+
+---
+
+If you want, I can take your **current APB coverage bins** and show exactly **which crosses are meaningful** versus which are just waste. This is how a lead would review it.
+
+Do you want me to do that next?
