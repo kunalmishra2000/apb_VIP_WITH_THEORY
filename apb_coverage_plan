@@ -1,0 +1,92 @@
+Perfect! Now we can apply all this to **APB protocol coverage**. I’ll break it down **clearly**, signal by signal, and tell you **which signals should have coverpoints only** and **which should be crossed**.
+
+---
+
+## 1️⃣ Signals typically in an APB interface
+
+| Signal    | Description           |
+| --------- | --------------------- |
+| `PSEL`    | Peripheral select     |
+| `PENABLE` | Transfer enable       |
+| `PWRITE`  | Read/write indication |
+| `PADDR`   | Address bus           |
+| `PWDATA`  | Write data bus        |
+| `PRDATA`  | Read data bus         |
+| `PREADY`  | Peripheral ready      |
+| `PSLVERR` | Error signal          |
+
+---
+
+## 2️⃣ Which signals can be **coverpoint only**
+
+These are **independent values** where you just care **which values/ranges occur**:
+
+| Signal    | Coverpoint type               | Reason                                          |
+| --------- | ----------------------------- | ----------------------------------------------- |
+| `PADDR`   | bins for address ranges       | We want to see low/mid/high addresses exercised |
+| `PWDATA`  | bins for data ranges          | To exercise different data values               |
+| `PRDATA`  | bins for expected read values | Helps check read data ranges                    |
+| `PREADY`  | bins for ready/no-ready       | Check wait states occurrence                    |
+| `PSLVERR` | bins for error/no-error       | Check error response triggered                  |
+
+> These **don’t need to be crossed initially** — we just want to see all possible values occur.
+
+---
+
+## 3️⃣ Which signals need **cross coverage**
+
+Crosses are needed for **combinations that matter for protocol behavior**. Examples:
+
+| Cross                     | Reason                                                                                             |
+| ------------------------- | -------------------------------------------------------------------------------------------------- |
+| `PSEL × PENABLE`          | Verify all states of transfer: idle vs setup vs access                                             |
+| `PWRITE × PADDR`          | Ensure write/read behavior is exercised across all address regions                                 |
+| `PWRITE × PREADY`         | Ensure writes/reads with wait states are exercised                                                 |
+| `PSEL × PREADY`           | Check peripheral ready response in both selected and non-selected states                           |
+| `PADDR × PREADY × PWRITE` | (Optional) For complex corner-case coverage — like back-to-back writes to high addresses with wait |
+
+---
+
+## 4️⃣ How to decide coverpoint vs cross
+
+**Rule of thumb**:
+
+1. Ask: **Does this signal need combinations with other signals to verify a feature?**
+
+   * Yes → Use **cross**
+   * No → Use **coverpoint only**
+
+2. Example:
+
+* `PADDR` → coverpoint only (ranges)
+* `PWRITE × PADDR` → cross (writing/reading at different addresses matters)
+* `PENABLE × PSEL` → cross (to check transfer states)
+
+---
+
+## 5️⃣ Small APB coverage hierarchy
+
+* **Coverpoints (single signal):**
+
+  * `PADDR`, `PWDATA`, `PRDATA`, `PREADY`, `PSLVERR`
+
+* **Cross coverage (combinations):**
+
+  * `PWRITE × PADDR`
+  * `PSEL × PENABLE`
+  * `PWRITE × PREADY`
+  * Optional: `PADDR × PWRITE × PREADY` for corner cases
+
+---
+
+✅ **Key takeaway:**
+
+* **Coverpoints → track values or ranges of single signals**
+* **Cross → track meaningful feature combinations / protocol behavior**
+* This ensures you **don’t miss bugs** in corner cases while still keeping coverage **manageable**.
+
+---
+
+If you want, I can **write a full APB coverage example** in SystemVerilog showing **coverpoints + crosses** based on this table — that would give you a concrete template you can use in your verification.
+
+Do you want me to do that?
