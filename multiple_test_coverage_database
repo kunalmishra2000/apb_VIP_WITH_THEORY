@@ -1,0 +1,127 @@
+Perfect! Let’s make a **practical example** using your APB scenario with **multiple testcases**, showing **how coverage databases are merged**. I’ll keep it simple and conceptual so you can apply it in real verification.
+
+---
+
+## 1️⃣ Suppose we have these testcases:
+
+| Testcase      | Description                        |
+| ------------- | ---------------------------------- |
+| `reset_test`  | Only does APB reset sequence       |
+| `write_test`  | Writes to multiple address ranges  |
+| `read_test`   | Reads from multiple address ranges |
+| `random_test` | Random read/write operations       |
+| `b2b_test`    | Back-to-back read/write operations |
+
+Each testcase will produce **its own coverage database** after simulation:
+
+* `sim_cov_reset/` → coverage for reset_test
+* `sim_cov_write/` → coverage for write_test
+* `sim_cov_read/` → coverage for read_test
+* `sim_cov_random/` → coverage for random_test
+* `sim_cov_b2b/` → coverage for back-to-back read/write
+
+---
+
+## 2️⃣ Simulate each testcase (VCS example)
+
+```bash
+# Reset test
+./simv +UVM_TESTNAME=reset_test +cover -cm_dir sim_cov_reset
+
+# Write test
+./simv +UVM_TESTNAME=write_test +cover -cm_dir sim_cov_write
+
+# Read test
+./simv +UVM_TESTNAME=read_test +cover -cm_dir sim_cov_read
+
+# Random test
+./simv +UVM_TESTNAME=random_test +cover -cm_dir sim_cov_random
+
+# Back-to-back test
+./simv +UVM_TESTNAME=b2b_test +cover -cm_dir sim_cov_b2b
+```
+
+* Each `-cm_dir` produces a **separate coverage database**.
+
+---
+
+## 3️⃣ Merge the coverage databases
+
+Using **VCS/URG**:
+
+```bash
+urg -dir sim_cov_reset \
+    -dir sim_cov_write \
+    -dir sim_cov_read \
+    -dir sim_cov_random \
+    -dir sim_cov_b2b \
+    -report merged_apb.ucdb
+```
+
+* `merged_apb.ucdb` now contains **combined coverage for all 5 testcases**.
+* You can now see which **bins/coverpoints/crosses** were exercised in **any of the tests**.
+
+---
+
+## 4️⃣ Generate a coverage report
+
+```bash
+urg -report merged_apb.ucdb -details -output merged_report.txt
+```
+
+* The report shows:
+
+  * **Coverpoints hit** (e.g., `PADDR low/mid/high`, `PWRITE read/write`)
+  * **Cross coverage** (e.g., `PWRITE × PADDR`)
+  * **Feature bins** (e.g., `setup_phase`, `transfer_end`)
+  * **Coverage holes** (bins not exercised in any test)
+
+> Example insight from merged report:
+>
+> * Reset_test → covered `idle` state
+> * Write_test → covered `write` for low/mid addresses
+> * Read_test → covered `read` for high addresses
+> * Random_test → filled remaining bins
+> * B2B_test → exercised back-to-back read/write cross
+
+---
+
+## 5️⃣ Key points
+
+* **Each test contributes partial coverage**
+* **Merging creates a single “full coverage” picture**
+* This helps verify **feature completeness** across multiple test scenarios
+* Without merging, you’d only see **coverage for individual testcases**, not the **combined functional coverage**
+
+---
+
+✅ **Summary diagram (conceptually)**
+
+```
+Testcases:          Coverage DB:
+reset_test          sim_cov_reset
+write_test          sim_cov_write
+read_test           sim_cov_read
+random_test         sim_cov_random
+b2b_test            sim_cov_b2b
+
+Merge: 
+urg -dir sim_cov_reset -dir sim_cov_write ... -> merged_apb.ucdb
+
+Merged report shows:
+- all coverpoints hit across tests
+- all cross coverage hit across tests
+- coverage holes if any bins never exercised
+```
+
+---
+
+If you want, I can **make a tiny APB coverage example** showing:
+
+* **Coverpoints for PADDR, PWRITE, PREADY**
+* **Crosses for PWRITE × PADDR**
+* **Feature bins for setup → access → transfer_end**
+
+…then show **how each test fills part of it** and the **merged report gives full coverage**.
+
+Do you want me to do that?
