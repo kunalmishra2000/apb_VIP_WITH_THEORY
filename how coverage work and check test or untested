@@ -94,3 +94,27 @@ Mode 3 | Key 0 ❌, Key 1 ❌
 If you want, I can make a **tiny visual diagram for 16×4 mode/key** like you first described, so you can **see all the coverage squares** at once — it’s very easy to understand visually.
 
 Do you want me to draw that?
+
+
+// Simple coverage for mode and key
+covergroup mode_key_cg @(posedge clk);
+    
+    // Coverpoint for mode
+    coverpoint mode {
+        bins mode0 = {0};
+        bins mode1 = {1};
+        bins mode2 = {2};
+        bins mode3 = {3};
+    }
+
+    // Coverpoint for key
+    coverpoint key {
+        bins key0 = {0};
+        bins key1 = {1};
+    }
+
+    // Cross coverage: mode × key combinations
+    cross mode, key;
+
+endgroup
+
