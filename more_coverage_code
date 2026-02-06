@@ -1,0 +1,180 @@
+Short answer: **yes, this is already *good* APB coverage** 👍
+Longer, honest answer: **it’s enough for most IP-level sign-off — but you *can* add a few high-value items if you want to be bullet-proof**.
+
+Let me break it down like a real coverage review.
+
+---
+
+## ✅ What you already cover (this is solid)
+
+Your current model already hits **all core APB features**:
+
+### ✔ Protocol & FSM
+
+* `PSEL / PENABLE / PREADY` states
+* SETUP → ACCESS → WAIT → DONE
+* Illegal state filtering
+
+### ✔ Transactions
+
+* Read
+* Write
+* Back-to-back capability (implicitly)
+* Random access
+
+### ✔ Addressing
+
+* Low / mid / high ranges
+* Read vs write address separation
+
+### ✔ Data
+
+* Read data ranges
+* Write data ranges
+
+### ✔ Wait states
+
+* No wait
+* With wait
+
+### ✔ Errors
+
+* Error on read
+* Error on write
+
+### ✔ Reset
+
+* Reset asserted / deasserted
+
+👉 **This alone is enough for APB2/APB3 IP sign-off** in many teams.
+
+---
+
+## ⚠️ What’s *optional* but HIGH-VALUE to add
+
+These are **not mandatory**, but reviewers love them.
+
+---
+
+## 🔥 1) Back-to-Back transaction coverage (explicit)
+
+Right now it’s implicit. Make it explicit:
+
+```systemverilog
+b2b_cp: coverpoint {psel, penable} {
+  bins back_to_back = (2'b11 => 2'b11);
+}
+```
+
+Covers:
+
+* write → write
+* read → read
+* read → write
+* write → read
+
+---
+
+## 🔥 2) Wait-state depth (very useful)
+
+Right now you only know *wait happened*.
+Add **how many waits**.
+
+```systemverilog
+wait_depth_cp: coverpoint pready iff (psel && penable) {
+  bins no_wait = (1);
+  bins one_wait = (0 => 1);
+  bins multi_wait = (0 => 0 => 1);
+}
+```
+
+---
+
+## 🔥 3) Error + Wait interaction
+
+Corner case many bugs hide in:
+
+```systemverilog
+error_wait_cross: cross error_coverpoint, wait_cp;
+```
+
+---
+
+## 🔥 4) Address boundary coverage
+
+APB bugs love boundaries:
+
+```systemverilog
+coverpoint paddr {
+  bins low_start  = {32'h0000_0000};
+  bins low_end    = {32'h0000_0FFF};
+  bins mid_start  = {32'h0000_1000};
+  bins high_start = {32'h8000_0000};
+  bins max_addr   = {32'hFFFF_FFFF};
+}
+```
+
+---
+
+## 🔥 5) Reset during activity (VERY GOOD)
+
+You already cover reset levels.
+Add **reset timing**:
+
+```systemverilog
+reset_x_fsm: cross reset_cp, fsm_cp;
+```
+
+Covers:
+
+* reset during IDLE
+* reset during SETUP
+* reset during ACCESS
+* reset during WAIT
+
+---
+
+## 🔥 6) Illegal protocol behavior (optional)
+
+Only if your DUT must tolerate it:
+
+```systemverilog
+illegal_cp: coverpoint {psel, penable} {
+  bins illegal = {2'b01}; // PENABLE without PSEL
+}
+```
+
+---
+
+## 📊 Coverage maturity scale
+
+| Level                   | Description           |
+| ----------------------- | --------------------- |
+| 🟢 Basic                | Sanity only           |
+| 🟢🟢🟢 **Your current** | **IP sign-off ready** |
+| 🟢🟢🟢🟢                | SoC / reuse ready     |
+| 🟢🟢🟢🟢🟢              | VIP / spec-grade      |
+
+You are at **🟢🟢🟢+** right now.
+
+---
+
+## 🎯 Final recommendation
+
+> **Stop adding coverage unless a testplan item demands it.**
+
+Coverage is not about *quantity*, it’s about:
+
+* meaningful bins
+* zero noise
+* clear mapping to testplan
+
+If you want, next I can:
+
+* Map **each coverpoint → testplan line**
+* Trim any **redundant bins**
+* Or help you answer the classic review question:
+
+  > *“Why didn’t you cover X?”*
+
+Just say the word 👌
