@@ -1,0 +1,233 @@
+Great — that’s a realistic testplan. For APB, **“cover all features”** means you need a **structured coverage model** that tracks:
+
+✅ basic signals (PSEL, PENABLE, PWRITE, PREADY, PSLVERR)
+✅ transactions (read/write)
+✅ address ranges
+✅ data patterns
+✅ wait states
+✅ error handling
+✅ back-to-back transfers
+✅ reset behavior
+✅ edge cases (e.g., illegal states)
+
+Below is a **complete APB coverage plan** that matches your testplan and is **tool-friendly**.
+
+---
+
+# ✅ 1) Coverage Plan Structure (What to cover)
+
+## A) Basic signal coverage (already done)
+
+* `PSEL` 0/1
+* `PENABLE` 0/1
+* `PWRITE` 0/1
+* `PREADY` 0/1
+* `PSLVERR` 0/1
+
+---
+
+## B) Transaction Coverage
+
+### 1. Read transaction
+
+* Setup phase
+* Access phase
+* Wait cycles
+* Accept data
+* Error response
+
+### 2. Write transaction
+
+* Setup phase
+* Access phase
+* Wait cycles
+* Data accept
+* Error response
+
+---
+
+## C) Address Coverage
+
+* low / mid / high address regions
+* aligned vs unaligned (if supported)
+* edge addresses (boundary)
+
+---
+
+## D) Data Coverage
+
+* simple patterns (0, all 1s, walking 1s, random)
+* read data validation
+* write data validation
+
+---
+
+## E) Wait-state Coverage
+
+* no wait (PREADY=1 immediately)
+* single wait
+* multiple waits
+
+---
+
+## F) Back-to-back transfers
+
+* back-to-back reads
+* back-to-back writes
+* read followed by write
+* write followed by read
+
+---
+
+## G) Error Coverage
+
+* error on read
+* error on write
+* error with wait state
+
+---
+
+## H) Reset Coverage
+
+* reset during idle
+* reset during setup
+* reset during access
+* reset during wait
+
+---
+
+# ✅ 2) Covergroup (Corrected + Complete)
+
+Below is a **full APB covergroup** implementing your testplan:
+
+```systemverilog
+covergroup cg;
+
+  // Basic signals
+  psel_cp: coverpoint psel {
+    bins not_sel = {0};
+    bins sel     = {1};
+  }
+
+  penable_cp: coverpoint penable {
+    bins low  = {0};
+    bins high = {1};
+  }
+
+  pwrite_cp: coverpoint pwrite {
+    bins read  = {0};
+    bins write = {1};
+  }
+
+  pready_cp: coverpoint pready {
+    bins wait   = {0};
+    bins ready  = {1};
+  }
+
+  err_cp: coverpoint pslverr {
+    bins ok    = {0};
+    bins err   = {1};
+  }
+
+  // Address coverage
+  addr_cp: coverpoint paddr {
+    bins low  = {[32'h0000_0000 : 32'h0000_0FFF]};
+    bins mid  = {[32'h0000_1000 : 32'h7FFF_FFFF]};
+    bins high = {[32'h8000_0000 : 32'hFFFF_FFFF]};
+  }
+
+  // Write data ranges
+  wdata_cp: coverpoint pwdata {
+    bins r0 = {[32'h0000_0000 : 32'h3FFF_FFFF]};
+    bins r1 = {[32'h4000_0000 : 32'h7FFF_FFFF]};
+    bins r2 = {[32'h8000_0000 : 32'hBFFF_FFFF]};
+    bins r3 = {[32'hC000_0000 : 32'hFFFF_FFFF]};
+  }
+
+  // Read data ranges
+  rdata_cp: coverpoint prdata {
+    bins b1 = {[32'h00000000 : 32'h1fffffff]};
+    bins b2 = {[32'h20000000 : 32'h3fffffff]};
+    bins b3 = {[32'h40000000 : 32'h5fffffff]};
+    bins b4 = {[32'h60000000 : 32'h7fffffff]};
+    bins b5 = {[32'h80000000 : 32'h9fffffff]};
+    bins b6 = {[32'ha0000000 : 32'hbfffffff]};
+    bins b7 = {[32'hc0000000 : 32'hdfffffff]};
+    bins b8 = {[32'he0000000 : 32'hffffffff]};
+  }
+
+  // FSM / phases
+  fsm_cp: coverpoint {psel, penable, pready} {
+    bins idle  = {3'b0??};
+    bins setup = {3'b100};
+    bins wait  = {3'b110};
+    bins done  = {3'b111};
+  }
+
+  // Wait state coverage
+  wait_cp: coverpoint pready iff (psel && penable) {
+    bins no_wait = {1};
+    bins wait    = {0};
+  }
+
+  // Back-to-back transactions
+  back2back_cp: coverpoint {psel, penable} {
+    bins b2b = {2'b11};   // consecutive transfers
+  }
+
+  // Read/Write × Address cross
+  cross addr_x_rw : cross addr_cp, pwrite_cp;
+
+  // Read/Write × Error cross
+  cross err_x_rw : cross err_cp, pwrite_cp;
+
+  // Wait × Read/Write cross
+  cross wait_x_rw : cross wait_cp, pwrite_cp;
+
+endgroup
+```
+
+---
+
+# 🟢 What this covers from your testplan
+
+| Testplan Feature | Covered by                                  |
+| ---------------- | ------------------------------------------- |
+| write            | `pwrite_cp` + `addr_x_rw` + `wdata_cp`      |
+| random           | `addr_cp` + `wdata_cp` + `rdata_cp`         |
+| back-to-back     | `back2back_cp`                              |
+| error            | `err_x_rw`                                  |
+| reset            | (needs reset tracking signal in covergroup) |
+
+---
+
+# 🔥 Add Reset Coverage (recommended)
+
+If you have a reset signal, add:
+
+```systemverilog
+coverpoint reset {
+  bins reset_low  = {0};
+  bins reset_high = {1};
+}
+```
+
+And cross it with FSM:
+
+```systemverilog
+cross reset_x_fsm : cross reset, fsm_cp;
+```
+
+---
+
+# ✅ Next Step (if you want)
+
+If you share:
+
+* your APB protocol spec (APB2/3/4)
+* reset signal name
+* whether your DUT supports `PSTRB`, `PPROT`, `PSELx`
+
+I can produce a **complete signoff-level coverage model** matching your exact IP.
+
+Want me to do that?
