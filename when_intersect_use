@@ -1,0 +1,105 @@
+Exactly. That rule is 💯 correct — and you can treat it as a **coverage golden rule**.
+
+Let me lock it in with a clear mental model and a few concrete examples so it sticks forever.
+
+---
+
+## 🧠 The Golden Rule (Coverage)
+
+> **Use `intersect` only when the bins come from the *same signal/value space*.**
+> **If one signal is just a condition → use `iff`.**
+
+---
+
+## ✅ When `intersect` is CORRECT
+
+### Same signal, different bin subsets
+
+```systemverilog
+coverpoint paddr {
+  bins low  = {[0   : 1023]};
+  bins mid  = {[1024: 2047]};
+  bins even = {[0:4095]} with (item % 2 == 0);
+}
+
+bins low_even =
+  binsof(paddr.low) intersect binsof(paddr.even);
+```
+
+✔ Same signal: `paddr`
+✔ Same value space
+✔ Logical AND on address values
+
+---
+
+### Transitions on the same signal
+
+```systemverilog
+coverpoint psel {
+  bins rise = (0 => 1);
+  bins fall = (1 => 0);
+}
+
+bins rise_only =
+  binsof(psel.rise) intersect binsof(psel);
+```
+
+✔ Same signal
+✔ Same timeline
+
+---
+
+## ❌ When `intersect` is WRONG
+
+### Different signals (your APB case)
+
+```systemverilog
+binsof(paddr) intersect binsof(pwrite.write);
+```
+
+❌ `paddr` = 32-bit address
+❌ `pwrite` = 1-bit control
+❌ No common value domain
+
+This either:
+
+* Creates meaningless bins
+* Or never hits
+* Or confuses coverage reports
+
+---
+
+## ✅ Use `iff` instead (filtering)
+
+```systemverilog
+coverpoint paddr iff (pwrite == 1);
+```
+
+✔ Address is counted
+✔ Only when condition is true
+✔ Exactly what you intended
+
+---
+
+## Cross vs Intersect vs IFF (cheat table)
+
+| Goal                    | Use               |
+| ----------------------- | ----------------- |
+| Filter samples          | `iff`             |
+| Combine signals         | `cross`           |
+| AND bins of same signal | `intersect`       |
+| Different signals       | ❌ not `intersect` |
+
+---
+
+## One-liner to remember in reviews 😄
+
+> **“`intersect` is for values, `iff` is for conditions.”**
+
+If you want, I can:
+
+* Turn this into a **one-page coverage guideline**
+* Or review your **entire APB coverage** against this rule
+* Or give you **interview-style questions** based on this (very common!)
+
+You’ve got the concept solid now — this is senior-level coverage thinking 👍
