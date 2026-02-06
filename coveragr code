@@ -1,0 +1,274 @@
+Nice progress 👍 — your intent is **100% aligned with an APB feature-complete testplan**, but this version still has **multiple compile errors + a few semantic coverage mistakes**.
+
+I’ll do this in **three layers** so it’s easy to follow:
+
+1️⃣ **Hard compile errors (must fix)**
+2️⃣ **Coverage logic mistakes (important)**
+3️⃣ **Cleaned, correct version of the critical parts**
+
+---
+
+# 1️⃣ HARD COMPILE ERRORS ❌ (blocking)
+
+These will **stop compilation**.
+
+---
+
+## ❌ 1. Typo: `peanble`
+
+```systemverilog
+penable_coverpoint: coverpoint peanble
+```
+
+✔ Fix:
+
+```systemverilog
+penable_coverpoint: coverpoint penable
+```
+
+---
+
+## ❌ 2. FSM transition typo
+
+```systemverilog
+bins setup_state = {3'b100 => 3'110};
+```
+
+❌ `3'110` is invalid
+
+✔ Fix:
+
+```systemverilog
+bins setup_state  = {3'b100 => 3'b110};
+bins access_state = {3'b110 => 3'b111};
+```
+
+---
+
+## ❌ 3. Duplicate cross name `fsm_cross`
+
+You declared **two `fsm_cross` blocks**.
+
+❌ Illegal in SystemVerilog
+
+✔ Keep **only one** (the second, more correct one).
+
+---
+
+## ❌ 4. Invalid cross syntax (this will not compile)
+
+```systemverilog
+//// Wait × Read/Write cross
+Wait_Read/Write cross pwrite_coverpoint,wait_cp;
+```
+
+❌ Invalid identifier
+❌ Invalid syntax
+
+✔ Fix:
+
+```systemverilog
+wait_rw_cross : cross pwrite_coverpoint, wait_cp;
+```
+
+---
+
+## ❌ 5. Illegal `intersect` usage in error cross
+
+```systemverilog
+bins read_erros_cross_bins
+  binsof(pwrite_coverpoint.pwrite_bins_read) intersect {0};
+```
+
+❌ `intersect` must be between **binsof()**, not raw values
+❌ Also wrong conceptually
+
+✔ Fix → **use cross bins directly** (shown below)
+
+---
+
+# 2️⃣ COVERAGE LOGIC ISSUES ⚠️ (important)
+
+These won’t always break compile, but **are wrong coverage-wise**.
+
+---
+
+## ⚠️ A. Cross + `iff` is redundant here
+
+```systemverilog
+cross paddr, pwrite_coverpoint {
+  bins address_for_write_trans = binsof(paddr) iff (pwrite==1);
+}
+```
+
+✔ Legal
+⚠️ But unnecessary
+
+✅ Better:
+
+```systemverilog
+coverpoint paddr iff (pwrite == 1);
+```
+
+(Unless your testplan *explicitly* wants addr × read/write matrix.)
+
+---
+
+## ⚠️ B. Error × Read/Write cross is wrong
+
+You want:
+
+* read + error
+* write + error
+
+That is **exactly what cross bins are for**, no `intersect`.
+
+---
+
+## ⚠️ C. Reset coverage should usually gate others
+
+You probably don’t want to count normal APB coverage **during reset**.
+
+Use `iff (!prest)` on most coverpoints.
+
+---
+
+# 3️⃣ CLEANED & CORRECT VERSION (key parts)
+
+Below is a **corrected, review-safe version** of the problematic sections only (not rewriting everything).
+
+---
+
+## ✅ Fixed basic coverpoints
+
+```systemverilog
+psel_coverpoint: coverpoint psel {
+  bins not_select_slave = {0};
+  bins select_slave     = {1};
+}
+
+penable_coverpoint: coverpoint penable {
+  bins enable_low  = {0};
+  bins enable_high = {1};
+}
+
+pwrite_coverpoint: coverpoint pwrite {
+  bins read  = {0};
+  bins write = {1};
+}
+
+pready_coverpoint: coverpoint pready {
+  bins wait   = {0};
+  bins accept = {1};
+}
+
+error_coverpoint: coverpoint pslverr {
+  bins no_error = {0};
+  bins error    = {1};
+}
+```
+
+---
+
+## ✅ Reset coverage (correct)
+
+```systemverilog
+reset_cp: coverpoint prest {
+  bins reset_asserted   = {0};
+  bins reset_deasserted = {1};
+}
+```
+
+---
+
+## ✅ FSM coverpoint (fixed)
+
+```systemverilog
+fsm_cp: coverpoint {psel, penable, pready} {
+  bins idle  = {3'b0??};
+  bins setup = {3'b100};
+  bins wait  = {3'b110};
+  bins done  = {3'b111};
+}
+```
+
+---
+
+## ✅ FSM cross (keep ONE)
+
+```systemverilog
+fsm_cross: cross psel_coverpoint, penable_coverpoint, pready_coverpoint {
+  ignore_bins illegal =
+    binsof(psel_coverpoint.not_select_slave) &&
+    binsof(penable_coverpoint.enable_high);
+}
+```
+
+---
+
+## ✅ Read/Write address coverage (best practice)
+
+```systemverilog
+coverpoint paddr iff (pwrite == 1) {
+  bins write_addr[] = {[32'h0 : 32'hFFFF_FFFF]};
+}
+
+coverpoint paddr iff (pwrite == 0) {
+  bins read_addr[] = {[32'h0 : 32'hFFFF_FFFF]};
+}
+```
+
+---
+
+## ✅ Error × Read/Write cross (correct)
+
+```systemverilog
+rw_error_cross : cross pwrite_coverpoint, error_coverpoint {
+  bins read_error  =
+    binsof(pwrite_coverpoint.read) &&
+    binsof(error_coverpoint.error);
+
+  bins write_error =
+    binsof(pwrite_coverpoint.write) &&
+    binsof(error_coverpoint.error);
+}
+```
+
+---
+
+## ✅ Wait × Read/Write cross (fixed)
+
+```systemverilog
+wait_rw_cross : cross pwrite_coverpoint, wait_cp;
+```
+
+---
+
+# 🧠 Final Review Verdict
+
+| Area                 | Status                             |
+| -------------------- | ---------------------------------- |
+| APB feature coverage | ✅                                  |
+| Read / Write         | ✅                                  |
+| Random               | ✅                                  |
+| Back-to-back         | ⚠️ (can add transition bins later) |
+| Error                | ✅                                  |
+| Reset                | ✅                                  |
+| intersect usage      | ❌ removed (correctly)              |
+| iff usage            | ✅ correct                          |
+
+---
+
+## 🔥 What I recommend next (optional)
+
+1️⃣ Add **back-to-back transition bins**
+2️⃣ Gate coverage with `iff (!prest)`
+3️⃣ Add **wait-count bins** (1 wait, >1 wait)
+
+If you want, I can:
+
+* **Finalize this to signoff-quality**
+* Or **map every bin to a testplan line item**
+* Or **add coverage comments reviewers love**
+
+Just tell me 👍
